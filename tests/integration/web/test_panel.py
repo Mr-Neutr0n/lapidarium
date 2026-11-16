@@ -246,6 +246,8 @@ def test_create_refuses_what_the_rules_forbid_and_keeps_the_form(site):
             "A type with the key 'song' already exists.",
         ]
     }
+    # The key that needs fixing sits in Advanced.
+    assert "<details open>" in response.text
     assert not EntryType.objects.filter(route="about").exists()
 
 

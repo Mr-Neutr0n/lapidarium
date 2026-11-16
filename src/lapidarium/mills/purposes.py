@@ -1,6 +1,7 @@
 """The site's types by purpose: new types from a purpose, changes to a type."""
 
 import re
+import unicodedata
 from typing import TYPE_CHECKING, override
 
 from lapidarium.mills.content import field_to_data, type_to_data
@@ -39,8 +40,17 @@ if TYPE_CHECKING:
     )
 
 
-def _key(label: str) -> str:
-    return re.sub(r"[^a-z0-9]+", "_", label.lower()).strip("_")
+def _key(label: str, *, remedy: str) -> str:
+    # NFKD splits "ą" into "a" plus a mark the ASCII encode drops; "ł" has no
+    # decomposition.
+    latin = (
+        unicodedata.normalize("NFKD", label.lower().replace("ł", "l"))
+        .encode("ascii", "ignore")
+        .decode()
+    )
+    if not (key := re.sub(r"[^a-z0-9]+", "_", latin).strip("_")):
+        raise TypeValidationError([f"No key can be made from {label!r}; {remedy}."])
+    return key
 
 
 def _settings(data: TypeSettingsData) -> TypeSettingsData:
@@ -139,7 +149,7 @@ class PurposeService(PurposeServiceProtocol):
         settings: dict[str, object] = {
             **TYPE_DEFAULTS,
             **_settings(data),
-            "key": data["key"] or _key(data["label"]),
+            "key": data["key"] or _key(data["label"], remedy="set one under Advanced"),
             "tint": self._schema.derive_tint(data["colour"]),
             "role": purpose.role,
             # After every type there is: the menu and the admin sort by it.
@@ -175,7 +185,7 @@ class PurposeService(PurposeServiceProtocol):
         if (new := data["added"]) is not None:
             settings: dict[str, SettingDefault] = {
                 **FIELD_DEFAULTS,
-                "key": _key(new["label"]),
+                "key": _key(new["label"], remedy="pick another name"),
                 "label": new["label"],
                 "kind": new["kind"],
             }
