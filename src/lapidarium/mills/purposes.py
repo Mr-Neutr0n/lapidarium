@@ -22,6 +22,7 @@ from lapidarium.pacts.purposes import (
     TypeChangeDTO,
     TypeEffect,
     TypeEffectDTO,
+    TypeSettingsData,
     TypeUseDTO,
     TypeValidationError,
 )
@@ -40,6 +41,21 @@ if TYPE_CHECKING:
 
 def _key(label: str) -> str:
     return re.sub(r"[^a-z0-9]+", "_", label.lower()).strip("_")
+
+
+def _settings(data: TypeSettingsData) -> TypeSettingsData:
+    """Return the settings in `data` a type takes as they are, without the rest."""
+    return {
+        "route": data["route"],
+        "colour": data["colour"],
+        "label": data["label"],
+        "label_plural": data["label_plural"],
+        "in_menu": data["in_menu"],
+        "has_detail_page": data["has_detail_page"],
+        "door_enabled": data["door_enabled"],
+        "allowed_parts": data["allowed_parts"],
+        "required_parts": data["required_parts"],
+    }
 
 
 def _find(types: Iterable[EntryTypeDTO], key: str) -> EntryTypeDTO:
@@ -120,22 +136,14 @@ class PurposeService(PurposeServiceProtocol):
             for field in purpose.fields
             if field.key in kept
         ]
-        settings: dict[str, SettingDefault | tuple[FieldDefinitionDTO, ...]] = {
+        settings: dict[str, object] = {
             **TYPE_DEFAULTS,
+            **_settings(data),
             "key": data["key"] or _key(data["label"]),
-            "label": data["label"],
-            "label_plural": data["label_plural"],
-            "route": data["route"],
-            "colour": data["colour"],
             "tint": self._schema.derive_tint(data["colour"]),
             "role": purpose.role,
             # After every type there is: the menu and the admin sort by it.
             "order": max((t.order for t in existing), default=-1) + 1,
-            "allowed_parts": tuple(data["allowed_parts"]),
-            "required_parts": tuple(data["required_parts"]),
-            "in_menu": data["in_menu"],
-            "has_detail_page": data["has_detail_page"],
-            "door_enabled": data["door_enabled"],
             "fields": tuple(
                 FieldDefinitionDTO.model_validate(field) for field in fields
             ),
@@ -177,21 +185,13 @@ class PurposeService(PurposeServiceProtocol):
         colour = data["colour"]
         changes: EntryTypeData = {
             **stored,
-            "label": data["label"],
-            "label_plural": data["label_plural"],
-            "route": data["route"],
-            "colour": colour,
+            **_settings(data),
             # A tint set by hand stays until the colour it was set for goes.
             "tint": (
                 current.tint
                 if colour == current.colour
                 else self._schema.derive_tint(colour)
             ),
-            "allowed_parts": data["allowed_parts"],
-            "required_parts": data["required_parts"],
-            "in_menu": data["in_menu"],
-            "has_detail_page": data["has_detail_page"],
-            "door_enabled": data["door_enabled"],
             "fields": fields,
         }
         changed = EntryTypeDTO.model_validate(changes)

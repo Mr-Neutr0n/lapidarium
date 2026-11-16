@@ -73,7 +73,7 @@
                   {% plural %}
                     {{ counter }} entries hold a {{ part }} part and cannot be saved until the part is removed
                   {% endblocktranslate %}
-                {% else %}
+                {% elif effect.kind == "part_missing" %}
                   {% blocktranslate count counter=effect.entries with part=effect.part trimmed %}
                     {{ counter }} entry has no {{ part }} part and cannot be saved until it gets one
                   {% plural %}

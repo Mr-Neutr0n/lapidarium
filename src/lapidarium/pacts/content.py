@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Protocol, TypedDict
 from pydantic import BaseModel, ConfigDict
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping, Sequence
+    from collections.abc import Iterable, Mapping, Sequence
     from pathlib import Path
 
     from lapidarium.pacts.site import FriendData, LinkData, ProfileData
@@ -95,6 +95,11 @@ class RelationRole(StrEnum):
 def role_label(role: str) -> str:
     """Readable form of a built-in role, or of a role no field defines any more."""
     return role.replace("_", " ")
+
+
+def enum_choices(members: Iterable[StrEnum]) -> list[tuple[str, str]]:
+    """Django choices for `members`, each labelled by its readable value."""
+    return [(m.value, m.value.replace("_", " ").capitalize()) for m in members]
 
 
 class ListFilter(StrEnum):

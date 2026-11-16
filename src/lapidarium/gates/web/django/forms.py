@@ -8,6 +8,7 @@ from lapidarium.pacts.content import (
     TYPE_DEFAULTS,
     FieldKind,
     PartKind,
+    enum_choices,
 )
 from lapidarium.pacts.theme import HEX_COLOUR
 
@@ -27,10 +28,8 @@ if TYPE_CHECKING:
 
 _MESSAGE_MAX_LENGTH = 5000
 _NAME_MAX_LENGTH = 100
-_PART_CHOICES = [(kind.value, kind.value.capitalize()) for kind in PartKind]
+_PART_CHOICES = enum_choices(PartKind)
 _FIELD = "field_"
-_NEW_LABEL = "new_field_label"
-_NEW_KIND = "new_field_kind"
 
 
 class HoneypotForm(forms.Form):
@@ -183,6 +182,20 @@ class NewTypeForm(_TypeForm):
 class ChangeTypeForm(_TypeForm):
     """New settings for a type, opening on the ones it has."""
 
+    new_field_label = forms.CharField(
+        label=_("Name of a new field"),
+        max_length=_NAME_MAX_LENGTH,
+        required=False,
+        widget=_text(),
+        help_text=_("Leave blank to add none."),
+    )
+    new_field_kind = forms.ChoiceField(
+        label=_("Kind of the new field"),
+        choices=enum_choices(PLAIN_FIELD_KINDS),
+        initial=FieldKind.TEXT.value,
+        widget=forms.Select(attrs={"class": "input"}),
+    )
+
     def __init__(self, data: QueryDict | None, *, entry_type: EntryTypeDTO) -> None:
         super().__init__(
             data,
@@ -200,27 +213,11 @@ class ChangeTypeForm(_TypeForm):
             labels={field.key: field.label for field in entry_type.fields},
             labels_required=True,
         )
-        self.fields[_NEW_LABEL] = forms.CharField(
-            label=_("Name of a new field"),
-            max_length=_NAME_MAX_LENGTH,
-            required=False,
-            widget=_text(),
-            help_text=_("Leave blank to add none."),
-        )
-        self.fields[_NEW_KIND] = forms.ChoiceField(
-            label=_("Kind of the new field"),
-            choices=[
-                (kind.value, kind.value.replace("_", " ").capitalize())
-                for kind in PLAIN_FIELD_KINDS
-            ],
-            initial=FieldKind.TEXT.value,
-            widget=forms.Select(attrs={"class": "input"}),
-        )
 
     def to_data(self) -> TypeChangeData:
         """Return the cleaned settings; read after `is_valid()`."""
-        label = self.cleaned_data[_NEW_LABEL]
-        kind = FieldKind(self.cleaned_data[_NEW_KIND])
+        label = self.cleaned_data["new_field_label"]
+        kind = FieldKind(self.cleaned_data["new_field_kind"])
         return {
             **self._settings(),
             "labels": self._labels(),
