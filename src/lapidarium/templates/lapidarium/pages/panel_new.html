@@ -73,7 +73,7 @@
           {% endfor %}
         </fieldset>
       {% endif %}
-      <details {% if form.key.errors or form.allowed_parts.errors or form.required_parts.errors %}open{% endif %}>
+      <details {% if form.errors %}open{% endif %}>
         <summary>{% translate "Advanced" %}</summary>
         <div class="form">
           {% include "lapidarium/components/form-field.html" with field=form.key %}

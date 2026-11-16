@@ -44,10 +44,11 @@ def _text() -> forms.TextInput:
     return forms.TextInput(attrs={"class": "input"})
 
 
-def _parts(label: _StrOrPromise) -> forms.MultipleChoiceField:
-    return forms.MultipleChoiceField(
+def _parts(label: _StrOrPromise) -> forms.TypedMultipleChoiceField:
+    return forms.TypedMultipleChoiceField(
         label=label,
         choices=_PART_CHOICES,
+        coerce=PartKind,
         required=False,
         widget=forms.CheckboxSelectMultiple,
     )
@@ -129,12 +130,10 @@ class NewTypeForm(forms.Form):
             "route": data["route"],
             "colour": data["colour"],
             "fields": {
-                field.name.removeprefix(_STARTER): label
-                for field in self.starters
-                if (label := data[field.name].strip())
+                key: label for key in self._starters if (label := data[_STARTER + key])
             },
-            "allowed_parts": [PartKind(kind) for kind in data["allowed_parts"]],
-            "required_parts": [PartKind(kind) for kind in data["required_parts"]],
+            "allowed_parts": data["allowed_parts"],
+            "required_parts": data["required_parts"],
             "in_menu": data["in_menu"],
             "has_detail_page": data["has_detail_page"],
             "door_enabled": data["door_enabled"],

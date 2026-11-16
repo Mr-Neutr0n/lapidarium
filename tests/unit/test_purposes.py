@@ -137,11 +137,26 @@ def test_create_refuses_a_type_that_breaks_the_rules():
     types.save_all.assert_not_called()
 
 
+@pytest.mark.parametrize(
+    ("label", "key"), (("Książki", "ksiazki"), ("Łódź nocą", "lodz_noca"))
+)
+def test_plan_transliterates_the_name_into_the_key(label, key):
+    types = MagicMock()
+    types.list_all.return_value = []
+
+    planned = _service(types).plan("work", _new_type(label=label, fields={}))
+
+    assert planned.key == key
+
+
 def test_create_refuses_a_name_no_key_can_be_made_from():
     types = MagicMock()
     types.list_all.return_value = []
 
     with pytest.raises(TypeValidationError) as caught:
-        _service(types).create("work", _new_type(label="???", fields={}))
+        _service(types).create("work", _new_type(label="作品", fields={}))
 
-    assert caught.value.messages == ("Key '' may hold only letters, digits, - and _.",)
+    assert caught.value.messages == (
+        "No key can be made from '作品'; set one under Advanced.",
+    )
+    types.save_all.assert_not_called()

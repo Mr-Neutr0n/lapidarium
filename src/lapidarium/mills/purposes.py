@@ -1,6 +1,7 @@
 """The site's types by purpose, and new types from a purpose."""
 
 import re
+import unicodedata
 from typing import TYPE_CHECKING, override
 
 from lapidarium.mills.content import type_to_data
@@ -28,7 +29,18 @@ if TYPE_CHECKING:
 
 
 def _key(label: str) -> str:
-    return re.sub(r"[^a-z0-9]+", "_", label.lower()).strip("_")
+    # NFKD splits "ą" into "a" plus a mark the ASCII encode drops; "ł" has no
+    # decomposition.
+    latin = (
+        unicodedata.normalize("NFKD", label.lower().replace("ł", "l"))
+        .encode("ascii", "ignore")
+        .decode()
+    )
+    if not (key := re.sub(r"[^a-z0-9]+", "_", latin).strip("_")):
+        raise TypeValidationError(
+            [f"No key can be made from {label!r}; set one under Advanced."]
+        )
+    return key
 
 
 class PurposeService(PurposeServiceProtocol):
