@@ -406,7 +406,6 @@ def test_preview_lists_what_a_change_does_to_entries_without_saving(site):
         ("part_refused", 1, "video"),
         ("part_missing", 2, "image"),
     ]
-    assert change.saved is False
     assert response.context["form"].errors == {}
     assert "2 entries move to a new address" in response.text
     assert (
@@ -466,6 +465,16 @@ def test_pages_gained_are_counted(site):
         ("page_gained", 2)
     ]
     assert "2 entries get their own pages" in gained.text
+
+
+def test_preview_says_when_a_type_leaves_the_menu(site):
+    site.force_login(get_user_model().objects.create_superuser("c", password="pw"))
+    data = {k: v for k, v in _SESSION.items() if k != "in_menu"}
+
+    response = site.post("/admin/panel/types/session/", {**data, "preview": "1"})
+
+    assert response.context["change"].effects == ()
+    assert "outside the menu" in response.text
 
 
 def test_change_refuses_what_the_rules_forbid_and_keeps_the_form(site):

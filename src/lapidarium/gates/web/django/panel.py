@@ -87,7 +87,7 @@ def panel_change(request: RootRequest, key: str) -> HttpResponse:
             for message in exc.messages:
                 form.add_error(None, message)
         else:
-            if change.saved:
+            if change is None:
                 return HttpResponseRedirect(reverse("panel") + "?changed=1")
     return render_page(
         request,

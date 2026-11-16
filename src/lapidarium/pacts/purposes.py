@@ -30,13 +30,12 @@ class TypeEffect(StrEnum):
 
 
 class TypeSettingsData(TypedDict):
-    """Settings both type forms of the panel hold; `fields` maps field key to label."""
+    """Settings both type forms of the panel hold."""
 
     label: str
     label_plural: str
     route: str
     colour: str
-    fields: dict[str, str]
     allowed_parts: list[PartKind]
     required_parts: list[PartKind]
     in_menu: bool
@@ -47,21 +46,26 @@ class TypeSettingsData(TypedDict):
 class NewTypeData(TypeSettingsData):
     """A type to create from a purpose.
 
-    A blank `key` is derived from `label`. `fields` names the starter fields
-    to keep.
+    A blank `key` is derived from `label`. `kept` maps the key of each starter
+    field to keep to its label.
     """
 
     key: str
+    kept: dict[str, str]
+
+
+class NewFieldData(TypedDict):
+    """A field to add to a type; its key is derived from `label`."""
+
+    label: str
+    kind: FieldKind
 
 
 class TypeChangeData(TypeSettingsData):
-    """New settings for a type.
+    """New settings for a type; `labels` maps the key of each field to its label."""
 
-    `fields` relabels the type's fields. `added` maps the label of each field
-    to add to its kind; the key is derived from the label.
-    """
-
-    added: dict[str, FieldKind]
+    labels: dict[str, str]
+    added: NewFieldData | None
 
 
 class StarterFieldDTO(BaseModel):
@@ -120,13 +124,12 @@ class TypeEffectDTO(BaseModel):
 
 
 class TypeChangeDTO(BaseModel):
-    """A type as a change leaves it, and whether the change is saved."""
+    """A type as a change leaves it, and what the change does to its entries."""
 
     model_config = ConfigDict(frozen=True)
 
     entry_type: EntryTypeDTO
     effects: tuple[TypeEffectDTO, ...]
-    saved: bool
 
     @property
     def consent(self) -> str:

@@ -21,7 +21,7 @@ def _new_type(**overrides):
         "label_plural": "Volunteering",
         "route": "volunteering",
         "colour": "#6b3fa0",
-        "fields": {"organisation": "Organisation", "position": "Role"},
+        "kept": {"organisation": "Organisation", "position": "Role"},
         "allowed_parts": list(PartKind),
         "required_parts": [],
         "in_menu": True,
@@ -101,7 +101,7 @@ def test_plan_derives_the_key_and_drops_fields_left_out_without_saving():
 
     planned = _service(types).plan(
         "job",
-        _new_type(label="Day job!", route="day-jobs", fields={"employer": "Company"}),
+        _new_type(label="Day job!", route="day-jobs", kept={"employer": "Company"}),
     )
 
     assert (planned.key, planned.order) == ("day_job", 0)
@@ -120,7 +120,7 @@ def test_create_refuses_a_type_that_breaks_the_rules():
                 key="song",
                 route="about",
                 colour="#ffff00",
-                fields={},
+                kept={},
                 allowed_parts=[PartKind.TEXT],
                 required_parts=[PartKind.IMAGE],
             ),
@@ -142,7 +142,7 @@ def test_create_refuses_a_name_no_key_can_be_made_from():
     types.list_all.return_value = []
 
     with pytest.raises(TypeValidationError) as caught:
-        _service(types).create("work", _new_type(label="???", fields={}))
+        _service(types).create("work", _new_type(label="???", kept={}))
 
     assert caught.value.messages == ("Key '' may hold only letters, digits, - and _.",)
 
@@ -152,8 +152,8 @@ def _change(entry_type, **overrides):
     stored = type_to_data(entry_type)
     return {
         **{key: stored[key] for key in TypeChangeData.__annotations__ if key in stored},
-        "fields": {field.key: field.label for field in entry_type.fields},
-        "added": {},
+        "labels": {field.key: field.label for field in entry_type.fields},
+        "added": None,
         **overrides,
     }
 
@@ -189,13 +189,13 @@ def test_plan_change_relabels_adds_a_field_and_keeps_the_rest_without_saving():
         _change(
             song,
             label="Tune",
-            fields={"album": "Record"},
-            added={"Year out": FieldKind.NUMBER},
+            labels={"album": "Record"},
+            added={"label": "Year out", "kind": FieldKind.NUMBER},
         ),
     )
 
     changed = planned.entry_type
-    assert (planned.effects, planned.saved, planned.consent) == ((), False, "")
+    assert (planned.effects, planned.consent) == ((), "")
     assert (changed.key, changed.label, changed.order, changed.tint) == (
         "song",
         "Tune",
@@ -282,35 +282,36 @@ def test_change_saves_only_with_consent_to_its_effects():
 
     for consent in ("", "moved::3"):
         refused = service.change("song", data, consent=consent)
-        assert (refused.saved, refused.consent) == (False, "moved::2")
+        assert refused.consent == "moved::2"
     types.save_all.assert_not_called()
 
-    saved = service.change("song", data, consent="moved::2")
+    assert service.change("song", data, consent="moved::2") is None
 
-    assert saved.saved is True
-    assert saved.entry_type.route == "tunes"
-    types.save_all.assert_called_once_with([type_to_data(saved.entry_type)])
+    [saved] = types.save_all.call_args.args[0]
+    assert saved == type_to_data(song) | {"route": "tunes"}
 
 
 def test_change_without_effects_needs_no_consent():
     song = type_dto("song")
     types = _types_with(song, entries=2)
+    data = _change(song, label="Tune")
 
-    saved = _service(types).change("song", _change(song, label="Tune"), consent="")
+    assert _service(types).change("song", data, consent="") is None
 
-    assert saved.saved is True
-    types.save_all.assert_called_once_with([type_to_data(saved.entry_type)])
+    [saved] = types.save_all.call_args.args[0]
+    assert saved == type_to_data(song) | {"label": "Tune"}
+    types.save_all.assert_called_once()
 
 
 def test_change_refuses_what_the_rules_forbid():
     song = type_dto("song", fields=[field_dto("album")])
     types = _types_with(song, type_dto("talk", route="talks"), entries=2)
 
+    album = {"label": "Album", "kind": FieldKind.RELATION}
+
     with pytest.raises(TypeValidationError) as caught:
         _service(types).change(
-            "song",
-            _change(song, route="talks", added={"Album": FieldKind.RELATION}),
-            consent="moved::2",
+            "song", _change(song, route="talks", added=album), consent="moved::2"
         )
 
     assert caught.value.messages == (
@@ -323,11 +324,10 @@ def test_change_refuses_what_the_rules_forbid():
 
 def test_change_refuses_a_field_name_no_key_can_be_made_from():
     song = type_dto("song")
+    data = _change(song, added={"label": "???", "kind": FieldKind.TEXT})
 
     with pytest.raises(TypeValidationError) as caught:
-        _service(_types_with(song)).change(
-            "song", _change(song, added={"???": FieldKind.TEXT}), consent=""
-        )
+        _service(_types_with(song)).change("song", data, consent="")
 
     assert caught.value.messages == (
         "Field key '' may hold only letters, digits, - and _.",

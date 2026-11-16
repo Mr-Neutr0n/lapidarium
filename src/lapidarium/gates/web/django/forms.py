@@ -121,6 +121,12 @@ class _TypeForm(forms.Form):
     def field_labels(self) -> list[forms.BoundField]:
         return [self[_FIELD + key] for key in self._labelled]
 
+    def _labels(self) -> dict[str, str]:
+        return {
+            field.name.removeprefix(_FIELD): self.cleaned_data[field.name]
+            for field in self.field_labels
+        }
+
     def _settings(self) -> TypeSettingsData:
         data = self.cleaned_data
         return {
@@ -128,11 +134,6 @@ class _TypeForm(forms.Form):
             "label": data["label"],
             "label_plural": data["label_plural"],
             "route": data["route"],
-            "fields": {
-                field.name.removeprefix(_FIELD): label
-                for field in self.field_labels
-                if (label := data[field.name].strip())
-            },
             "allowed_parts": [PartKind(kind) for kind in data["allowed_parts"]],
             "required_parts": [PartKind(kind) for kind in data["required_parts"]],
             "in_menu": data["in_menu"],
@@ -172,7 +173,11 @@ class NewTypeForm(_TypeForm):
 
     def to_data(self) -> NewTypeData:
         """Return the cleaned type; read after `is_valid()`."""
-        return {**self._settings(), "key": self.cleaned_data["key"]}
+        return {
+            **self._settings(),
+            "key": self.cleaned_data["key"],
+            "kept": {key: label for key, label in self._labels().items() if label},
+        }
 
 
 class ChangeTypeForm(_TypeForm):
@@ -214,6 +219,10 @@ class ChangeTypeForm(_TypeForm):
 
     def to_data(self) -> TypeChangeData:
         """Return the cleaned settings; read after `is_valid()`."""
-        label = self.cleaned_data[_NEW_LABEL].strip()
+        label = self.cleaned_data[_NEW_LABEL]
         kind = FieldKind(self.cleaned_data[_NEW_KIND])
-        return {**self._settings(), "added": {label: kind} if label else {}}
+        return {
+            **self._settings(),
+            "labels": self._labels(),
+            "added": {"label": label, "kind": kind} if label else None,
+        }

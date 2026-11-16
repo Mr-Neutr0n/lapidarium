@@ -109,15 +109,16 @@ class PurposeService(PurposeServiceProtocol):
     def plan(self, purpose_key: str, data: NewTypeData) -> EntryTypeDTO:
         purpose = self.purpose(purpose_key)
         existing = self._types.list_all()
+        kept = data["kept"]
         fields: list[dict[str, SettingDefault]] = [
             {
                 **FIELD_DEFAULTS,
                 "key": field.key,
-                "label": data["fields"][field.key],
+                "label": kept[field.key],
                 "kind": field.kind,
             }
             for field in purpose.fields
-            if field.key in data["fields"]
+            if field.key in kept
         ]
         settings: dict[str, SettingDefault | tuple[FieldDefinitionDTO, ...]] = {
             **TYPE_DEFAULTS,
@@ -140,9 +141,7 @@ class PurposeService(PurposeServiceProtocol):
             ),
         }
         planned = EntryTypeDTO.model_validate(settings)
-        errors = [*type_errors(self._schema, planned), *_clashes(planned, existing)]
-        if errors:
-            raise TypeValidationError(errors)
+        self._check(planned, others=existing)
         return planned
 
     @override
@@ -161,19 +160,19 @@ class PurposeService(PurposeServiceProtocol):
         current = _find(existing, key)
         stored = type_to_data(current)
         fields: list[FieldDefinitionData] = [
-            {**field, "label": data["fields"].get(field["key"], field["label"])}
+            {**field, "label": data["labels"][field["key"]]}
             for field in stored["fields"]
         ]
         errors: list[str] = []
-        for label, kind in data["added"].items():
+        if (new := data["added"]) is not None:
             settings: dict[str, SettingDefault] = {
                 **FIELD_DEFAULTS,
-                "key": _key(label),
-                "label": label,
-                "kind": kind,
+                "key": _key(new["label"]),
+                "label": new["label"],
+                "kind": new["kind"],
             }
             added = FieldDefinitionDTO.model_validate(settings)
-            errors.extend(_new_field_errors(added, {f["key"] for f in fields}))
+            errors = _new_field_errors(added, {f["key"] for f in fields})
             fields.append(field_to_data(added))
         colour = data["colour"]
         changes: EntryTypeData = {
@@ -196,26 +195,36 @@ class PurposeService(PurposeServiceProtocol):
             "fields": fields,
         }
         changed = EntryTypeDTO.model_validate(changes)
-        errors = [
-            *type_errors(self._schema, changed),
-            *errors,
-            *_clashes(changed, [t for t in existing if t.key != key]),
-        ]
-        if errors:
-            raise TypeValidationError(errors)
-        return TypeChangeDTO(
-            entry_type=changed, effects=self._effects(current, changed), saved=False
+        self._check(
+            changed, others=[t for t in existing if t.key != key], errors=errors
         )
+        effects = self._effects(current, changed)
+        return TypeChangeDTO(entry_type=changed, effects=effects)
 
     @override
-    def change(self, key: str, data: TypeChangeData, *, consent: str) -> TypeChangeDTO:
+    def change(
+        self, key: str, data: TypeChangeData, *, consent: str
+    ) -> TypeChangeDTO | None:
         planned = self.plan_change(key, data)
         if planned.consent != consent:
             return planned
         self._types.save_all([type_to_data(planned.entry_type)])
-        return TypeChangeDTO(
-            entry_type=planned.entry_type, effects=planned.effects, saved=True
-        )
+        return None
+
+    def _check(
+        self,
+        planned: EntryTypeDTO,
+        *,
+        others: Iterable[EntryTypeDTO],
+        errors: Iterable[str] = (),
+    ) -> None:
+        """Raise `TypeValidationError` with the schema's, `errors` and clashes."""
+        if found := [
+            *type_errors(self._schema, planned),
+            *errors,
+            *_clashes(planned, others),
+        ]:
+            raise TypeValidationError(found)
 
     def _effects(
         self, current: EntryTypeDTO, changed: EntryTypeDTO

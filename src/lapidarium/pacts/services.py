@@ -225,10 +225,13 @@ class PurposeServiceProtocol(Protocol):
         Raises `NotFoundError` or `TypeValidationError`.
         """
 
-    def change(self, key: str, data: TypeChangeData, *, consent: str) -> TypeChangeDTO:
+    def change(
+        self, key: str, data: TypeChangeData, *, consent: str
+    ) -> TypeChangeDTO | None:
         """Save the change if `consent` is the `consent` of its effects.
 
-        A change with no effects has a blank one.
+        A change with no effects has a blank one. Return `None` once saved,
+        and the unsaved change otherwise.
 
         Raises `NotFoundError` or `TypeValidationError`.
         """
