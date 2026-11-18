@@ -66,6 +66,10 @@ HTTPS with `gh` as the credential helper, so they look for a remote named
 git remote add https-origin https://github.com/fancysnake/lapidarium.git
 ```
 
+## Support the project
+
+If lapidarium is useful to you, [sponsor it on GitHub](https://github.com/sponsors/fancysnake).
+
 ## License
 
 [MIT](LICENSE).
